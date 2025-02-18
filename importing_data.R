@@ -56,7 +56,8 @@ dados16 <- read_sheet("1qyRG6rzmjSrvakv2xruOQP7I67qnaFJcmV1Jv-EKkYk", sheet = "2
 dados16 <- dados16 %>%
   clean_names() %>%
   filter(!is.na(de_para)) %>%
-  dplyr::select(no, tipo, de_para, resumo, data )
+  dplyr::select(no, tipo, de_para, resumo, data ) %>%
+  mutate(no = as.character(no))
 
 dados17 <- read_sheet("1qyRG6rzmjSrvakv2xruOQP7I67qnaFJcmV1Jv-EKkYk", sheet = "2017-2018")
 dados17 <- dados17 %>%
@@ -64,7 +65,19 @@ dados17 <- dados17 %>%
   filter(!is.na(de_para)) %>%
   rename(no = numero,
          tipo = tipo_documento) %>%
-  dplyr::select(no, tipo, de_para, resumo, data )
+  dplyr::select(no, tipo, de_para, resumo, data ) %>%
+  mutate(no = as.character(no))
+
+# Converte cada elemento: se já for POSIXct, transforma em string; senão, mantém
+# Em seguida, interpreta as strings considerando os possíveis formatos
+
+
+dados17 <- dados17 %>%
+  mutate(data = parse_date_time(map_chr(data, as.character),
+                                orders = c("ymd HMS", "ymd", "mdy HMS", "mdy"),
+                                tz = "UTC"))
+
+
 
 dados19 <- read_sheet("1qyRG6rzmjSrvakv2xruOQP7I67qnaFJcmV1Jv-EKkYk",
                       sheet = "2019-2020", col_types = "c")
@@ -75,4 +88,23 @@ dados19 <- dados19 %>%
   dplyr::select(no, tipo, de_para, resumo, data )
 
 cables <- bind_rows(dados12, dados13, dados14, dados15a, dados15b, dados16, dados17, dados19)
+library(here)
+write.table(cables, file=here("dados transformados","cables_reserved.csv"), sep=";", row.names=F)
 
+# pra llm
+# 200 linhas
+
+# Número total de linhas
+n <- nrow(cables)
+
+# Cria um vetor de grupos: 7 grupos com 200 linhas e 1 grupo com o restante (204 linhas)
+grupos <- rep(1:8, each = 200, length.out = n)
+
+# Divide o data frame de acordo com os grupos
+lista_cables <- split(cables, grupos)
+
+# Salva cada parte em um arquivo CSV separado
+map2(lista_cables, 1:8, ~ {
+  arquivo <- here("dados transformados", paste0("cables_reserved_", .y, ".csv"))
+  write.table(.x, file = arquivo, sep = ";", row.names = FALSE)
+})
